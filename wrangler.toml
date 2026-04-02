@@ -1,0 +1,10 @@
+name = "devchat-admin"
+main = "src/index.tsx"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[dev]
+ip = "0.0.0.0"
+
+[vars]
+BACKEND_URL = "http://localhost:8787"

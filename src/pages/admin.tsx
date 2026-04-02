@@ -1,0 +1,564 @@
+import { html } from 'hono/html'
+import type { FC } from 'hono/jsx'
+import { Layout } from './layout'
+
+export const AdminPage: FC = () => {
+  return (
+    <Layout title="Admin 대시보드 — DevChat">
+      {/* 네비게이션 바 */}
+      <nav class="admin-nav">
+        <a href="/chat" class="logo">💬 DevChat</a>
+        <span class="nav-sep">/</span>
+        <span class="nav-current">Admin 대시보드</span>
+        <a href="/chat" class="nav-back">← 채팅으로 돌아가기</a>
+      </nav>
+
+      {/* 페이지 컨테이너 */}
+      <div class="admin-page">
+        <div class="admin-page__header">
+          <div class="admin-page__breadcrumb">어드민 &gt; Admin 대시보드</div>
+          <h1 class="admin-page__title">Admin 대시보드</h1>
+        </div>
+
+        {/* 탭 네비게이션 */}
+        <div class="admin-tabs">
+          <button class="tab-btn" data-tab="users">가입자 관리</button>
+          <button class="tab-btn" data-tab="channels">채널 관리</button>
+          <button class="tab-btn" data-tab="stats-users">사용자 통계</button>
+          <button class="tab-btn" data-tab="stats-messages">메시지 통계</button>
+          <button class="tab-btn" data-tab="cs">CS 상담 관리</button>
+        </div>
+
+        {/* 탭 패널: 가입자 관리 */}
+        <div id="panel-users" class="tab-panel">
+          <table class="cs-table" id="table-users">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>사용자명</th>
+                <th>이메일</th>
+                <th>역할</th>
+                <th>가입일</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-users">
+              <tr><td colspan={6} class="cs-table-empty">불러오는 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 탭 패널: 채널 관리 */}
+        <div id="panel-channels" class="tab-panel" hidden>
+          <table class="cs-table" id="table-channels">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>채널명</th>
+                <th>타입</th>
+                <th>멤버 수</th>
+                <th>메시지 수</th>
+                <th>생성일</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-channels">
+              <tr><td colspan={7} class="cs-table-empty">불러오는 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 탭 패널: 사용자 통계 */}
+        <div id="panel-stats-users" class="tab-panel" hidden>
+          <div class="admin-stats-grid">
+            <div class="stat-card">
+              <div class="stat-card__label">총 가입자 수</div>
+              <div class="stat-card__value" id="stat-total">-</div>
+              <div class="stat-card__unit">명</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__label">오늘 신규 가입</div>
+              <div class="stat-card__value" id="stat-today">-</div>
+              <div class="stat-card__unit">명</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card__label">활성 사용자</div>
+              <div class="stat-card__value" id="stat-active">-</div>
+              <div class="stat-card__unit">명 (최근 24시간)</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 탭 패널: 메시지 통계 */}
+        <div id="panel-stats-messages" class="tab-panel" hidden>
+          <div class="stat-summary">
+            총 메시지 수: <strong id="stat-msg-total">-</strong> 개
+          </div>
+          <p style="font-size:13px;color:var(--text3);margin-bottom:12px;">채널별 메시지 현황</p>
+          <table class="cs-table" id="table-msg-stats">
+            <thead>
+              <tr>
+                <th>채널명</th>
+                <th>메시지 수</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-msg-stats">
+              <tr><td colspan={2} class="cs-table-empty">불러오는 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 탭 패널: CS 상담 관리 */}
+        <div id="panel-cs" class="tab-panel" hidden>
+          <table class="cs-table" id="table-cs">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>파트너명</th>
+                <th>상태</th>
+                <th>방문자 ID</th>
+                <th>메시지 수</th>
+                <th>생성일</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-cs">
+              <tr><td colspan={6} class="cs-table-empty">불러오는 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 모달: 역할 변경 */}
+      <div class="modal-overlay" id="modal-role" style="display:none">
+        <div class="modal">
+          <h3>역할 변경</h3>
+          <p class="modal__desc">
+            <strong id="modal-role-username"></strong>의 역할을{' '}
+            <strong id="modal-role-direction"></strong>으로 변경합니까?
+          </p>
+          <p class="modal__error" id="modal-role-error" style="display:none"></p>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="modal-role-cancel">취소</button>
+            <button class="btn-primary" id="modal-role-confirm">변경</button>
+          </div>
+        </div>
+      </div>
+
+      {/* 모달: 계정 삭제 */}
+      <div class="modal-overlay" id="modal-delete-user" style="display:none">
+        <div class="modal">
+          <h3>계정 삭제</h3>
+          <p class="modal__desc">
+            <strong id="modal-del-user-name"></strong> 계정을 삭제합니까?
+          </p>
+          <p class="modal__warning">이 작업은 되돌릴 수 없습니다.</p>
+          <p class="modal__error" id="modal-del-user-error" style="display:none"></p>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="modal-del-user-cancel">취소</button>
+            <button class="btn-danger" id="modal-del-user-confirm">삭제</button>
+          </div>
+        </div>
+      </div>
+
+      {/* 모달: 채널 삭제 */}
+      <div class="modal-overlay" id="modal-delete-channel" style="display:none">
+        <div class="modal">
+          <h3>채널 삭제</h3>
+          <p class="modal__desc">
+            <strong id="modal-del-ch-name"></strong> 채널을 삭제합니까?
+          </p>
+          <p class="modal__warning">채널 내 모든 메시지가 함께 삭제됩니다.</p>
+          <p class="modal__error" id="modal-del-ch-error" style="display:none"></p>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="modal-del-ch-cancel">취소</button>
+            <button class="btn-danger" id="modal-del-ch-confirm">삭제</button>
+          </div>
+        </div>
+      </div>
+
+      {html`<script>
+    (function() {
+      var token = localStorage.getItem('token');
+      if (!token) { location.href = '/login'; return; }
+
+      var $ = function(s) { return document.querySelector(s); };
+
+      // ─── 공통 유틸 ───
+      function esc(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      function fmtDate(str) {
+        if (!str) return '-';
+        return str.split('T')[0];
+      }
+
+      function handleAuthError(status) {
+        if (status === 401) { location.href = '/login'; return true; }
+        if (status === 403) { alert('관리자 권한이 필요합니다.'); location.href = '/chat'; return true; }
+        return false;
+      }
+
+      // ─── 탭 전환 ───
+      var TABS = ['users', 'channels', 'stats-users', 'stats-messages', 'cs'];
+      var loadedTabs = {};
+
+      function activateTab(tabId) {
+        if (TABS.indexOf(tabId) === -1) tabId = 'users';
+
+        // 버튼 활성화 상태 업데이트
+        document.querySelectorAll('.tab-btn').forEach(function(btn) {
+          btn.classList.toggle('tab-btn--active', btn.dataset.tab === tabId);
+        });
+
+        // 패널 표시/숨김
+        TABS.forEach(function(t) {
+          var panel = document.getElementById('panel-' + t);
+          if (panel) panel.hidden = (t !== tabId);
+        });
+
+        // 탭별 데이터 로드 (최초 1회)
+        if (!loadedTabs[tabId]) {
+          loadedTabs[tabId] = true;
+          switch(tabId) {
+            case 'users':         loadUsers(); break;
+            case 'channels':      loadChannels(); break;
+            case 'stats-users':   loadStatsUsers(); break;
+            case 'stats-messages': loadStatsMessages(); break;
+            case 'cs':            loadCsSessions(); break;
+          }
+        }
+      }
+
+      // 탭 버튼 이벤트
+      document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          location.hash = '#' + btn.dataset.tab;
+        });
+      });
+
+      // hash 변경 감지
+      function onHashChange() {
+        var hash = location.hash.replace('#', '') || 'users';
+        activateTab(hash);
+      }
+      window.addEventListener('hashchange', onHashChange);
+      onHashChange(); // 초기 로드
+
+      // ─── 가입자 관리 ───
+      var currentUserId = null;
+
+      function loadUsers() {
+        // 현재 유저 정보 파싱 (JWT payload)
+        try {
+          var payload = JSON.parse(atob(token.split('.')[1]));
+          currentUserId = payload.id;
+        } catch(e) { currentUserId = null; }
+
+        fetch('/api/admin/users', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) {
+          if (handleAuthError(r.status)) return;
+          return r.json();
+        }).then(function(data) {
+          if (!data) return;
+          renderUsers(data.users || []);
+        }).catch(function(e) {
+          console.error('가입자 목록 로드 실패:', e);
+          $('#tbody-users').innerHTML = '<tr><td colspan="6" class="cs-table-empty">불러오기 실패. 새로고침 해주세요.</td></tr>';
+        });
+      }
+
+      function renderUsers(users) {
+        var tbody = $('#tbody-users');
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="cs-table-empty">가입된 사용자가 없습니다.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = users.map(function(u) {
+          var isSelf = (u.id === currentUserId);
+          var roleBadge = isSelf
+            ? '<span class="role-badge role-badge--' + esc(u.role) + ' role-badge--self">' + esc(u.role) + '</span>'
+            : '<button class="role-badge role-badge--' + esc(u.role) + '" onclick="openRoleModal(' + u.id + ',\\'' + esc(u.username) + '\\',\\'' + esc(u.role) + '\\')">' + esc(u.role) + '</button>';
+          var manageCell = isSelf
+            ? '<span style="font-size:12px;color:var(--text3)">(본인)</span>'
+            : '<button class="cs-link-btn" style="color:var(--danger)" onclick="openDeleteUserModal(' + u.id + ',\\'' + esc(u.username) + '\\')">삭제</button>';
+          return '<tr>' +
+            '<td>' + u.id + '</td>' +
+            '<td><strong>' + esc(u.username) + '</strong></td>' +
+            '<td style="color:var(--text2)">' + esc(u.email || '-') + '</td>' +
+            '<td>' + roleBadge + '</td>' +
+            '<td>' + fmtDate(u.created_at) + '</td>' +
+            '<td>' + manageCell + '</td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      // ─── 역할 변경 모달 ───
+      var pendingRoleUserId = null;
+      var pendingNewRole = null;
+
+      window.openRoleModal = function(id, username, currentRole) {
+        pendingRoleUserId = id;
+        pendingNewRole = (currentRole === 'admin') ? 'user' : 'admin';
+        $('#modal-role-username').textContent = username;
+        $('#modal-role-direction').textContent = currentRole + ' → ' + pendingNewRole;
+        $('#modal-role-error').style.display = 'none';
+        $('#modal-role-confirm').disabled = false;
+        $('#modal-role-confirm').textContent = '변경';
+        $('#modal-role').style.display = 'flex';
+      };
+
+      $('#modal-role-cancel').addEventListener('click', function() {
+        $('#modal-role').style.display = 'none';
+      });
+
+      $('#modal-role-confirm').addEventListener('click', function() {
+        if (!pendingRoleUserId) return;
+        $('#modal-role-confirm').disabled = true;
+        $('#modal-role-confirm').textContent = '처리 중...';
+
+        fetch('/api/admin/users/' + pendingRoleUserId + '/role', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ role: pendingNewRole })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          $('#modal-role-confirm').disabled = false;
+          $('#modal-role-confirm').textContent = '변경';
+          if (data.error) {
+            $('#modal-role-error').textContent = data.error || data.message || '변경에 실패했습니다.';
+            $('#modal-role-error').style.display = 'block';
+            return;
+          }
+          $('#modal-role').style.display = 'none';
+          loadedTabs['users'] = false;
+          loadUsers();
+        }).catch(function() {
+          $('#modal-role-confirm').disabled = false;
+          $('#modal-role-confirm').textContent = '변경';
+          $('#modal-role-error').textContent = '역할 변경에 실패했습니다.';
+          $('#modal-role-error').style.display = 'block';
+        });
+      });
+
+      // ─── 계정 삭제 모달 ───
+      var pendingDeleteUserId = null;
+
+      window.openDeleteUserModal = function(id, username) {
+        pendingDeleteUserId = id;
+        $('#modal-del-user-name').textContent = username;
+        $('#modal-del-user-error').style.display = 'none';
+        $('#modal-del-user-confirm').disabled = false;
+        $('#modal-del-user-confirm').textContent = '삭제';
+        $('#modal-delete-user').style.display = 'flex';
+      };
+
+      $('#modal-del-user-cancel').addEventListener('click', function() {
+        $('#modal-delete-user').style.display = 'none';
+      });
+
+      $('#modal-del-user-confirm').addEventListener('click', function() {
+        if (!pendingDeleteUserId) return;
+        $('#modal-del-user-confirm').disabled = true;
+        $('#modal-del-user-confirm').textContent = '처리 중...';
+
+        fetch('/api/admin/users/' + pendingDeleteUserId, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          $('#modal-del-user-confirm').disabled = false;
+          $('#modal-del-user-confirm').textContent = '삭제';
+          if (data.error) {
+            $('#modal-del-user-error').textContent = data.error || data.message || '삭제에 실패했습니다.';
+            $('#modal-del-user-error').style.display = 'block';
+            return;
+          }
+          $('#modal-delete-user').style.display = 'none';
+          loadedTabs['users'] = false;
+          loadUsers();
+        }).catch(function() {
+          $('#modal-del-user-confirm').disabled = false;
+          $('#modal-del-user-confirm').textContent = '삭제';
+          $('#modal-del-user-error').textContent = '계정 삭제에 실패했습니다.';
+          $('#modal-del-user-error').style.display = 'block';
+        });
+      });
+
+      // ─── 채널 관리 ───
+      function loadChannels() {
+        fetch('/api/admin/channels', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) {
+          if (handleAuthError(r.status)) return;
+          return r.json();
+        }).then(function(data) {
+          if (!data) return;
+          renderChannels(data.channels || []);
+        }).catch(function(e) {
+          console.error('채널 목록 로드 실패:', e);
+          $('#tbody-channels').innerHTML = '<tr><td colspan="7" class="cs-table-empty">불러오기 실패. 새로고침 해주세요.</td></tr>';
+        });
+      }
+
+      function renderChannels(channels) {
+        var tbody = $('#tbody-channels');
+        if (channels.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="cs-table-empty">등록된 채널이 없습니다.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = channels.map(function(ch) {
+          return '<tr>' +
+            '<td>' + ch.id + '</td>' +
+            '<td><strong>' + esc(ch.name) + '</strong></td>' +
+            '<td style="color:var(--text2)">' + esc(ch.type || '-') + '</td>' +
+            '<td>' + (ch.member_count || 0) + '</td>' +
+            '<td>' + (ch.message_count || 0) + '</td>' +
+            '<td>' + fmtDate(ch.created_at) + '</td>' +
+            '<td><button class="cs-link-btn" style="color:var(--danger)" onclick="openDeleteChannelModal(' + ch.id + ',\\'' + esc(ch.name) + '\\')">삭제</button></td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      // ─── 채널 삭제 모달 ───
+      var pendingDeleteChannelId = null;
+
+      window.openDeleteChannelModal = function(id, name) {
+        pendingDeleteChannelId = id;
+        $('#modal-del-ch-name').textContent = name;
+        $('#modal-del-ch-error').style.display = 'none';
+        $('#modal-del-ch-confirm').disabled = false;
+        $('#modal-del-ch-confirm').textContent = '삭제';
+        $('#modal-delete-channel').style.display = 'flex';
+      };
+
+      $('#modal-del-ch-cancel').addEventListener('click', function() {
+        $('#modal-delete-channel').style.display = 'none';
+      });
+
+      $('#modal-del-ch-confirm').addEventListener('click', function() {
+        if (!pendingDeleteChannelId) return;
+        $('#modal-del-ch-confirm').disabled = true;
+        $('#modal-del-ch-confirm').textContent = '처리 중...';
+
+        fetch('/api/admin/channels/' + pendingDeleteChannelId, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          $('#modal-del-ch-confirm').disabled = false;
+          $('#modal-del-ch-confirm').textContent = '삭제';
+          if (data.error) {
+            $('#modal-del-ch-error').textContent = data.error || data.message || '삭제에 실패했습니다.';
+            $('#modal-del-ch-error').style.display = 'block';
+            return;
+          }
+          $('#modal-delete-channel').style.display = 'none';
+          loadedTabs['channels'] = false;
+          loadChannels();
+        }).catch(function() {
+          $('#modal-del-ch-confirm').disabled = false;
+          $('#modal-del-ch-confirm').textContent = '삭제';
+          $('#modal-del-ch-error').textContent = '채널 삭제에 실패했습니다.';
+          $('#modal-del-ch-error').style.display = 'block';
+        });
+      });
+
+      // ─── 사용자 통계 ───
+      function loadStatsUsers() {
+        fetch('/api/admin/stats/users', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) {
+          if (handleAuthError(r.status)) return;
+          return r.json();
+        }).then(function(data) {
+          if (!data) return;
+          $('#stat-total').textContent = (data.total !== undefined) ? data.total.toLocaleString() : '-';
+          $('#stat-today').textContent = (data.today !== undefined) ? data.today.toLocaleString() : '-';
+          $('#stat-active').textContent = (data.active_24h !== undefined) ? data.active_24h.toLocaleString() : '-';
+        }).catch(function(e) {
+          console.error('사용자 통계 로드 실패:', e);
+        });
+      }
+
+      // ─── 메시지 통계 ───
+      function loadStatsMessages() {
+        fetch('/api/admin/stats/messages', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) {
+          if (handleAuthError(r.status)) return;
+          return r.json();
+        }).then(function(data) {
+          if (!data) return;
+          $('#stat-msg-total').textContent = (data.total !== undefined) ? data.total.toLocaleString() : '-';
+          var channels = data.by_channel || [];
+          if (channels.length === 0) {
+            $('#tbody-msg-stats').innerHTML = '<tr><td colspan="2" class="cs-table-empty">메시지 통계가 없습니다.</td></tr>';
+            return;
+          }
+          $('#tbody-msg-stats').innerHTML = channels.map(function(ch) {
+            return '<tr>' +
+              '<td><strong>' + esc(ch.name || ('채널 #' + ch.channel_id)) + '</strong></td>' +
+              '<td>' + (ch.count || 0).toLocaleString() + '</td>' +
+              '</tr>';
+          }).join('');
+        }).catch(function(e) {
+          console.error('메시지 통계 로드 실패:', e);
+          $('#tbody-msg-stats').innerHTML = '<tr><td colspan="2" class="cs-table-empty">불러오기 실패. 새로고침 해주세요.</td></tr>';
+        });
+      }
+
+      // ─── CS 상담 관리 ───
+      function loadCsSessions() {
+        fetch('/api/admin/cs-sessions', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) {
+          if (handleAuthError(r.status)) return;
+          return r.json();
+        }).then(function(data) {
+          if (!data) return;
+          renderCsSessions(data.sessions || []);
+        }).catch(function(e) {
+          console.error('CS 상담 목록 로드 실패:', e);
+          $('#tbody-cs').innerHTML = '<tr><td colspan="6" class="cs-table-empty">불러오기 실패. 새로고침 해주세요.</td></tr>';
+        });
+      }
+
+      function renderCsSessions(sessions) {
+        var tbody = $('#tbody-cs');
+        if (sessions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="cs-table-empty">CS 상담 세션이 없습니다.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = sessions.map(function(s) {
+          var isActive = s.status === 'active' || s.status === 'open';
+          var statusBadge = '<span class="cs-status-badge ' +
+            (isActive ? 'cs-status-badge--active' : 'cs-status-badge--inactive') + '">' +
+            (isActive ? '활성' : '종료') + '</span>';
+          return '<tr>' +
+            '<td>' + s.id + '</td>' +
+            '<td><strong>' + esc(s.partner_name || '-') + '</strong></td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="color:var(--text2)">' + esc(s.visitor_id || '-') + '</td>' +
+            '<td>' + (s.message_count || 0) + '</td>' +
+            '<td>' + fmtDate(s.created_at) + '</td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      // ─── 모달 오버레이 클릭 시 닫기 ───
+      document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) overlay.style.display = 'none';
+        });
+      });
+
+    })();
+      </script>`}
+    </Layout>
+  )
+}

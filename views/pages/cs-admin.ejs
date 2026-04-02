@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>CS 파트너 관리 — DevChat 어드민</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body { background: var(--bg); color: var(--text); }
+    .admin-nav { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+    .admin-nav .logo { font-size: 16px; font-weight: 700; text-decoration: none; color: var(--text); }
+    .admin-nav .nav-sep { color: var(--text3); }
+    .admin-nav .nav-current { font-size: 14px; color: var(--text2); }
+    .admin-nav .nav-back { margin-left: auto; font-size: 13px; color: var(--primary); text-decoration: none; }
+    .admin-nav .nav-back:hover { color: var(--primary-hover); }
+  </style>
+</head>
+<body>
+  <nav class="admin-nav">
+    <a href="/chat" class="logo">💬 DevChat</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-current">CS 파트너 관리</span>
+    <a href="/chat" class="nav-back">← 채팅으로 돌아가기</a>
+  </nav>
+
+  <div class="cs-admin">
+    <div class="cs-admin-header">
+      <div>
+        <div class="cs-admin-breadcrumb">어드민 > CS 파트너 관리</div>
+        <h2>CS 파트너 관리</h2>
+      </div>
+      <button class="btn-primary" id="open-register-btn">+ 새 파트너 등록</button>
+    </div>
+
+    <!-- 파트너 목록 테이블 -->
+    <table class="cs-table" id="partners-table">
+      <thead>
+        <tr>
+          <th>서비스명</th>
+          <th>설명</th>
+          <th>생성일</th>
+          <th>활성 세션</th>
+          <th>누적 상담</th>
+          <th>상태</th>
+          <th>관리</th>
+        </tr>
+      </thead>
+      <tbody id="partners-tbody">
+        <tr>
+          <td colspan="7" class="cs-table-empty">불러오는 중...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 파트너 등록 모달 -->
+  <div class="modal-overlay" id="register-modal" style="display:none">
+    <div class="modal">
+      <h3>새 파트너 등록</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">등록 후 API 토큰이 발급됩니다. 토큰은 최초 1회만 확인 가능합니다.</p>
+      <input type="text" id="reg-name" placeholder="서비스명 (필수)" maxlength="100">
+      <input type="text" id="reg-desc" placeholder="설명 (선택)" maxlength="300">
+      <p id="reg-error" style="display:none;color:var(--danger);font-size:13px;margin:4px 0;"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="register-cancel">취소</button>
+        <button class="btn-primary" id="register-submit">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토큰 발급 완료 모달 -->
+  <div class="modal-overlay" id="token-modal" style="display:none">
+    <div class="modal" style="max-width:500px">
+      <h3>토큰 발급 완료</h3>
+      <div class="cs-token-modal__warning">
+        ⚠ API 토큰은 이 화면에서만 확인 가능합니다. 반드시 복사 후 안전한 곳에 보관하세요.
+      </div>
+
+      <div class="cs-snippet-label">API 토큰</div>
+      <div class="cs-copy-field" id="token-copy-field">
+        <code class="cs-copy-field__value" id="token-value"></code>
+        <button class="cs-copy-field__btn" id="copy-token-btn">복사</button>
+      </div>
+
+      <div class="cs-snippet-label">임베드 스니펫 (외부 사이트 HTML에 삽입)</div>
+      <div class="cs-copy-field">
+        <code class="cs-copy-field__value" id="snippet-value"></code>
+        <button class="cs-copy-field__btn" id="copy-snippet-btn">복사</button>
+      </div>
+
+      <textarea class="cs-snippet-value" id="snippet-textarea" readonly rows="3" style="margin-top:4px;"></textarea>
+
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn-primary" id="token-confirm">확인 후 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토큰 재발급 확인 모달 -->
+  <div class="modal-overlay" id="rotate-modal" style="display:none">
+    <div class="modal">
+      <h3>토큰 재발급</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">
+        기존 토큰은 즉시 <strong style="color:var(--danger)">무효화</strong>됩니다.<br>
+        위젯을 사용 중인 경우 서비스가 중단될 수 있습니다.
+      </p>
+      <p id="rotate-partner-name" style="font-size:15px;font-weight:600;margin-bottom:16px;"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="rotate-cancel">취소</button>
+        <button class="btn-danger" id="rotate-confirm">재발급</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 활성/비활성 전환 확인 모달 -->
+  <div class="modal-overlay" id="toggle-modal" style="display:none">
+    <div class="modal">
+      <h3 id="toggle-title">파트너 비활성화</h3>
+      <p id="toggle-desc" style="font-size:13px;color:var(--text2);margin-bottom:16px;"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="toggle-cancel">취소</button>
+        <button class="btn-primary" id="toggle-confirm">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const token = localStorage.getItem('token');
+      if (!token) { location.href = '/login'; return; }
+
+      const $  = (s) => document.querySelector(s);
+      let pendingRotateId = null;
+      let pendingToggleId = null;
+      let pendingToggleActive = null;
+
+      // ─── 파트너 목록 로드 ───
+      function loadPartners() {
+        fetch('/api/cs/partners', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) {
+          if (r.status === 401 || r.status === 403) {
+            alert('어드민 권한이 필요합니다.');
+            location.href = '/chat';
+            return;
+          }
+          return r.json();
+        }).then(function(data) {
+          if (!data) return;
+          renderPartners(data.partners || []);
+        }).catch(function(e) {
+          console.error('파트너 목록 로드 실패:', e);
+        });
+      }
+      loadPartners();
+
+      function esc(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      function fmtDate(str) {
+        if (!str) return '-';
+        return str.split('T')[0];
+      }
+
+      function renderPartners(partners) {
+        const tbody = $('#partners-tbody');
+        if (partners.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="cs-table-empty">등록된 파트너가 없습니다. 새 파트너를 등록하세요.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = partners.map(function(p) {
+          var isActive = p.is_active === 1 || p.is_active === true;
+          return '<tr>' +
+            '<td><strong>' + esc(p.name) + '</strong></td>' +
+            '<td style="color:var(--text2)">' + esc(p.description || '-') + '</td>' +
+            '<td>' + fmtDate(p.created_at) + '</td>' +
+            '<td>' + (p.active_session_count || 0) + '</td>' +
+            '<td>' + (p.total_session_count || 0) + '</td>' +
+            '<td><span class="cs-status-badge ' + (isActive ? 'cs-status-badge--active' : 'cs-status-badge--inactive') + '">' + (isActive ? '활성' : '비활성') + '</span></td>' +
+            '<td style="display:flex;gap:8px;align-items:center">' +
+              '<button class="cs-link-btn" onclick="openRotate(' + p.id + ',\'' + esc(p.name) + '\')">토큰 재발급</button>' +
+              '<button class="cs-link-btn" style="color:' + (isActive ? 'var(--danger)' : 'var(--success)') + '" onclick="openToggle(' + p.id + ',' + (isActive ? 'true' : 'false') + ',\'' + esc(p.name) + '\')">' + (isActive ? '비활성화' : '활성화') + '</button>' +
+            '</td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      // ─── 파트너 등록 ───
+      $('#open-register-btn').addEventListener('click', function() {
+        $('#reg-name').value = '';
+        $('#reg-desc').value = '';
+        $('#reg-error').style.display = 'none';
+        $('#register-modal').style.display = 'flex';
+        setTimeout(function() { $('#reg-name').focus(); }, 50);
+      });
+
+      $('#register-cancel').addEventListener('click', function() {
+        $('#register-modal').style.display = 'none';
+      });
+
+      $('#register-submit').addEventListener('click', function() {
+        var name = $('#reg-name').value.trim();
+        var desc = $('#reg-desc').value.trim();
+        if (!name) {
+          $('#reg-error').textContent = '서비스명을 입력하세요.';
+          $('#reg-error').style.display = 'block';
+          return;
+        }
+        $('#reg-error').style.display = 'none';
+        $('#register-submit').disabled = true;
+        $('#register-submit').textContent = '등록 중...';
+
+        fetch('/api/cs/partners', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ name: name, description: desc })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          $('#register-submit').disabled = false;
+          $('#register-submit').textContent = '등록';
+          if (data.error) {
+            $('#reg-error').textContent = data.error;
+            $('#reg-error').style.display = 'block';
+            return;
+          }
+          $('#register-modal').style.display = 'none';
+          // 토큰 발급 완료 모달 표시
+          showTokenModal(data.token, data.embed_snippet);
+          loadPartners();
+        }).catch(function(e) {
+          $('#register-submit').disabled = false;
+          $('#register-submit').textContent = '등록';
+          $('#reg-error').textContent = '등록에 실패했습니다. 다시 시도해주세요.';
+          $('#reg-error').style.display = 'block';
+        });
+      });
+
+      // ─── 토큰 모달 ───
+      function showTokenModal(rawToken, snippet) {
+        $('#token-value').textContent = rawToken;
+        $('#snippet-value').textContent = snippet.length > 60 ? snippet.slice(0, 57) + '...' : snippet;
+        $('#snippet-textarea').value = snippet;
+        $('#token-modal').style.display = 'flex';
+      }
+
+      function copyText(text, btn) {
+        navigator.clipboard.writeText(text).then(function() {
+          btn.textContent = '복사됨 ✓';
+          btn.classList.add('cs-copy-field__btn--copied');
+          setTimeout(function() {
+            btn.textContent = '복사';
+            btn.classList.remove('cs-copy-field__btn--copied');
+          }, 2000);
+        }).catch(function() {
+          // clipboard API 미지원 시 fallback
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          btn.textContent = '복사됨 ✓';
+          btn.classList.add('cs-copy-field__btn--copied');
+          setTimeout(function() {
+            btn.textContent = '복사';
+            btn.classList.remove('cs-copy-field__btn--copied');
+          }, 2000);
+        });
+      }
+
+      $('#copy-token-btn').addEventListener('click', function() {
+        copyText($('#token-value').textContent, this);
+      });
+
+      $('#copy-snippet-btn').addEventListener('click', function() {
+        copyText($('#snippet-textarea').value, this);
+      });
+
+      $('#token-confirm').addEventListener('click', function() {
+        $('#token-modal').style.display = 'none';
+      });
+
+      // ─── 토큰 재발급 ───
+      window.openRotate = function(id, name) {
+        pendingRotateId = id;
+        $('#rotate-partner-name').textContent = name;
+        $('#rotate-modal').style.display = 'flex';
+      };
+
+      $('#rotate-cancel').addEventListener('click', function() {
+        $('#rotate-modal').style.display = 'none';
+      });
+
+      $('#rotate-confirm').addEventListener('click', function() {
+        if (!pendingRotateId) return;
+        $('#rotate-confirm').disabled = true;
+        $('#rotate-confirm').textContent = '처리 중...';
+
+        fetch('/api/cs/partners/' + pendingRotateId + '/token', {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          $('#rotate-confirm').disabled = false;
+          $('#rotate-confirm').textContent = '재발급';
+          $('#rotate-modal').style.display = 'none';
+          if (data.error) { alert(data.error); return; }
+          showTokenModal(data.token, data.embed_snippet);
+          loadPartners();
+        }).catch(function() {
+          $('#rotate-confirm').disabled = false;
+          $('#rotate-confirm').textContent = '재발급';
+          alert('토큰 재발급에 실패했습니다.');
+        });
+      });
+
+      // ─── 활성/비활성 전환 ───
+      window.openToggle = function(id, isActive, name) {
+        pendingToggleId = id;
+        pendingToggleActive = !isActive; // 전환 대상
+        $('#toggle-title').textContent = isActive ? '파트너 비활성화' : '파트너 활성화';
+        $('#toggle-desc').innerHTML = isActive
+          ? '<strong>' + esc(name) + '</strong>을 비활성화하면 해당 파트너의 위젯이 동작하지 않습니다.'
+          : '<strong>' + esc(name) + '</strong>을 활성화합니다.';
+        $('#toggle-confirm').className = isActive ? 'btn-danger' : 'btn-primary';
+        $('#toggle-modal').style.display = 'flex';
+      };
+
+      $('#toggle-cancel').addEventListener('click', function() {
+        $('#toggle-modal').style.display = 'none';
+      });
+
+      $('#toggle-confirm').addEventListener('click', function() {
+        if (pendingToggleId === null) return;
+        $('#toggle-confirm').disabled = true;
+
+        fetch('/api/cs/partners/' + pendingToggleId, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ is_active: pendingToggleActive })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          $('#toggle-confirm').disabled = false;
+          $('#toggle-modal').style.display = 'none';
+          if (data.error) { alert(data.error); return; }
+          loadPartners();
+        }).catch(function() {
+          $('#toggle-confirm').disabled = false;
+          alert('처리에 실패했습니다.');
+        });
+      });
+
+      // Enter 키로 등록
+      $('#reg-name').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') $('#register-submit').click();
+      });
+    })();
+  </script>
+</body>
+</html>
